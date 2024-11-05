@@ -1,6 +1,6 @@
 import sys
 import pygame
-
+from gestor_manos import GestureDetector
 
 # Configuración de Pygame
 pygame.init()
@@ -17,6 +17,7 @@ VERDE = (34, 139, 34)
 GRIS = (192, 192, 192)
 AMARILLO = (255, 215, 0)
 MORADO = (138, 43, 226)
+NARANJA = (255, 165, 0)
 
 # Dimensiones del tablero
 TAM_CASILLA = ANCHO // 8
@@ -46,11 +47,16 @@ def imprimir_tablero(tablero):
         print(f"{i} {' '.join(map(str, fila))}")
 
 # Dibuja el tablero y las piezas
-def dibujar_tablero(ventana, tablero, movimientos_validos, mejor_movimiento=None):
+def dibujar_tablero(ventana, tablero, movimientos_validos, selector_pos, pieza_seleccionada, mejor_movimiento=None):
     ventana.fill(NEGRO)
     for fila in range(8):
         for col in range(fila % 2, 8, 2):
             pygame.draw.rect(ventana, GRIS, (col * TAM_CASILLA, fila * TAM_CASILLA, TAM_CASILLA, TAM_CASILLA))
+    
+    # Dibujar selector
+    if selector_pos is not None:
+        fila, col = selector_pos
+        pygame.draw.rect(ventana, NARANJA, (col * TAM_CASILLA, fila * TAM_CASILLA, TAM_CASILLA, TAM_CASILLA), 3)
     
     for fila in range(8):
         for col in range(8):
@@ -71,11 +77,47 @@ def dibujar_tablero(ventana, tablero, movimientos_validos, mejor_movimiento=None
                 if CROWN:
                     ventana.blit(CROWN, (col * TAM_CASILLA + TAM_CASILLA // 2 - CROWN.get_width() // 2, fila * TAM_CASILLA + TAM_CASILLA // 2 - CROWN.get_height() // 2))
     
+    # Resaltar movimientos válidos
     for mov in movimientos_validos:
         fila, col = mov
         pygame.draw.circle(ventana, VERDE, (col * TAM_CASILLA + TAM_CASILLA // 2, fila * TAM_CASILLA + TAM_CASILLA // 2), TAM_CASILLA // 2 - 10)
     
     pygame.display.update()
+
+# Función para obtener el movimiento del jugador (simulando gestos)
+def get_player_move(tablero):
+    # Simula la entrada de gestos solicitando input al usuario
+    print("Es tu turno.")
+    while True:
+        try:
+            print("Ingresa la fila y columna de la pieza que deseas mover (e.g., '2 3'):")
+            input_str = input()
+            fila_origen, col_origen = map(int, input_str.strip().split())
+            if not (0 <= fila_origen < 8 and 0 <= col_origen < 8):
+                print("Posición fuera del tablero.")
+                continue
+            if tablero[fila_origen][col_origen] == 0 or tablero[fila_origen][col_origen] % 2 != 1:
+                print("No hay una pieza válida en esa posición.")
+                continue
+            movimientos_validos = generar_movimientos(tablero, fila_origen, col_origen)
+            if not movimientos_validos:
+                print("No hay movimientos válidos para esa pieza.")
+                continue
+            print(f"Movimientos posibles: {movimientos_validos}")
+            print("Ingresa la fila y columna de destino (e.g., '3 4'):")
+            input_str = input()
+            fila_destino, col_destino = map(int, input_str.strip().split())
+            if not (0 <= fila_destino < 8 and 0 <= col_destino < 8):
+                print("Posición fuera del tablero.")
+                continue
+            if (fila_destino, col_destino) in movimientos_validos:
+                return (fila_origen, col_origen), (fila_destino, col_destino)
+            else:
+                print("Movimiento inválido.")
+        except:
+            print("Entrada inválida.")
+    return None, None
+
 
 def dibujar_botones(ventana):
     fuente = pygame.font.SysFont(None, 36)
@@ -178,7 +220,7 @@ def generar_movimientos(tablero, fila, col):
             movimientos.append((nueva_fila, nueva_col))
     
     movimientos += generar_capturas(tablero, fila, col, pieza)
-    print(f"Movimientos generados para la pieza en ({fila}, {col}): {movimientos}")  # Depuración
+    # print(f"Movimientos generados para la pieza en ({fila}, {col}): {movimientos}")  # Depuración
     return movimientos
 
 def generar_capturas(tablero, fila, col, pieza):
@@ -353,65 +395,6 @@ def obtener_dificultad():
                     elif ALTO // 2 + 100 <= y <= ALTO // 2 + 150:
                         return 6  # Difícil
 
-def jugar_damas():
-    while True:
-        dificultad = obtener_dificultad()
-        tablero = inicializar_tablero()
-        seleccionado = None
-        movimientos_validos = []
-        turno = 1  # Turno de las piezas rojas primero
-        jugadas_erroneas = []  # Guardar las jugadas no óptimas
-        corriendo = True
-        while corriendo:
-            for evento in pygame.event.get():
-                if evento.type == pygame.QUIT:
-                    corriendo = False
-                elif evento.type == pygame.MOUSEBUTTONDOWN and turno == 1:
-                    x, y = pygame.mouse.get_pos()
-                    fila, col = y // TAM_CASILLA, x // TAM_CASILLA
-                    if seleccionado:
-                        if (fila, col) in movimientos_validos:
-                            _, mejor_movimiento = minimax(tablero, dificultad, float('-inf'), float('inf'), False)
-                            if mejor_movimiento and mejor_movimiento != tablero:
-                                jugadas_erroneas.append((tablero, mejor_movimiento))  # Guardar jugada no óptima
-                            captura = mover(tablero, seleccionado, (fila, col))
-                            validar_promociones(tablero)  # Validar promociones después de cada movimiento
-                            if captura:
-                                comer_aut(tablero, fila, col, tablero[fila][col])
-                                if not ver_comer(tablero, fila, col, tablero[fila][col]):
-                                    turno = 3 - turno
-                            else:
-                                turno = 3 - turno
-                            seleccionado = None
-                            movimientos_validos = []
-                        else:
-                            seleccionado = None
-                            movimientos_validos = []
-                    elif tablero[fila][col] != 0 and tablero[fila][col] % 2 == turno % 2:
-                        seleccionado = (fila, col)
-                        movimientos_validos = generar_movimientos(tablero, fila, col)
-            
-            dibujar_tablero(VENTANA, tablero, movimientos_validos)
-            
-            if turno == 2:  # Turno de la computadora
-                _, mejor_movimiento = minimax(tablero, dificultad, float('-inf'), float('inf'), True)
-                if mejor_movimiento is not None:
-                    tablero = mejor_movimiento
-                    validar_promociones(tablero)
-                    turno = 1  # Cambia al turno del jugador
-                imprimir_tablero(tablero)  # Imprimir el tablero después del movimiento de la computadora
-            
-            if es_estado_terminal(tablero):
-                corriendo = False
-                ganador = 'Rojo' if turno == 2 else 'Azul' if turno == 1 else 'Empate'
-                print(f"Juego terminado. Ganador: {ganador}")
-                
-                # Mostrar retroalimentación al jugador
-                if jugadas_erroneas:
-                    mostrar_retroalimentacion(VENTANA, jugadas_erroneas)
-
-        pygame.quit()
-        sys.exit()
 
 def hay_movimientos(tablero, jugador):
     for fila in range(8):
@@ -420,5 +403,136 @@ def hay_movimientos(tablero, jugador):
                 if generar_movimientos(tablero, fila, col):
                     return True
     return False
+
+
+# Función principal del juego
+def jugar_damas():
+    # Crear instancia del detector de gestos
+    detector = GestureDetector()
+    while True:
+        dificultad = obtener_dificultad()
+        tablero = inicializar_tablero()
+        turno = 1  # Turno de las piezas rojas primero
+        jugadas_erroneas = []  # Guardar las jugadas no óptimas
+        corriendo = True
+
+        # Inicializar selector
+        selector_fila, selector_col = 7, 0  # Posición inicial del selector
+        pieza_seleccionada = None
+        movimientos_validos = []
+
+        while corriendo:
+            # Variables para las acciones basadas en gestos
+            move_left = False
+            move_right = False
+            move_up = False
+            move_down = False
+            confirm = False
+            cancel = False
+
+            for evento in pygame.event.get():
+                if evento.type == pygame.QUIT:
+                    corriendo = False
+                elif evento.type == pygame.KEYDOWN and turno == 1:
+                    if evento.key == pygame.K_LEFT:
+                        move_left = True
+                    elif evento.key == pygame.K_RIGHT:
+                        move_right = True
+                    elif evento.key == pygame.K_UP:
+                        move_up = True
+                    elif evento.key == pygame.K_DOWN:
+                        move_down = True
+                    elif evento.key == pygame.K_RETURN or evento.key == pygame.K_SPACE:
+                        confirm = True
+                    elif evento.key == pygame.K_ESCAPE:
+                        cancel = True
+
+            # Procesar gestos
+            gestos = detector.obtener_gestos()
+
+            for gesto, mano in gestos:
+                if gesto == 'palma_abierta':
+                    if mano == 'Right':
+                        confirm = True
+                    elif mano == 'Left':
+                        cancel = True
+                elif gesto == 'dedo_apuntando_derecha':
+                    move_right = True
+                elif gesto == 'dedo_apuntando_izquierda':
+                    move_left = True
+                elif gesto == 'dedo_apuntando_arriba':
+                    move_up = True
+                elif gesto == 'dedo_apuntando_abajo':
+                    move_down = True
+
+            # Actualizar el juego según las acciones detectadas
+            if turno == 1:
+                if move_left:
+                    selector_col = max(0, selector_col - 1)
+                if move_right:
+                    selector_col = min(7, selector_col + 1)
+                if move_up:
+                    selector_fila = max(0, selector_fila - 1)
+                if move_down:
+                    selector_fila = min(7, selector_fila + 1)
+                if confirm:
+                    if pieza_seleccionada is None:
+                        # Intentar seleccionar una pieza
+                        if tablero[selector_fila][selector_col] != 0 and tablero[selector_fila][selector_col] % 2 == turno % 2:
+                            pieza_seleccionada = (selector_fila, selector_col)
+                            movimientos_validos = generar_movimientos(tablero, selector_fila, selector_col)
+                            if not movimientos_validos:
+                                print("No hay movimientos válidos para esa pieza.")
+                                pieza_seleccionada = None
+                                movimientos_validos = []
+                        else:
+                            print("No hay una pieza válida en esa posición.")
+                    else:
+                        # Intentar mover la pieza seleccionada
+                        if (selector_fila, selector_col) in movimientos_validos:
+                            fila_origen, col_origen = pieza_seleccionada
+                            fila_destino, col_destino = selector_fila, selector_col
+                            _, mejor_movimiento = minimax(tablero, dificultad, float('-inf'), float('inf'), False)
+                            if mejor_movimiento and mejor_movimiento != tablero:
+                                jugadas_erroneas.append((tablero, mejor_movimiento))  # Guardar jugada no óptima
+                            captura = mover(tablero, (fila_origen, col_origen), (fila_destino, col_destino))
+                            validar_promociones(tablero)
+                            if captura:
+                                comer_aut(tablero, fila_destino, col_destino, tablero[fila_destino][col_destino])
+                                if not ver_comer(tablero, fila_destino, col_destino, tablero[fila_destino][col_destino]):
+                                    turno = 3 - turno
+                            else:
+                                turno = 3 - turno
+                            pieza_seleccionada = None
+                            movimientos_validos = []
+                        else:
+                            print("Movimiento inválido.")
+                if cancel:
+                    # Cancelar selección
+                    pieza_seleccionada = None
+                    movimientos_validos = []
+
+            dibujar_tablero(VENTANA, tablero, movimientos_validos, (selector_fila, selector_col), pieza_seleccionada)
+            pygame.display.update()
+
+            if turno == 2:  # Turno de la computadora
+                _, mejor_movimiento = minimax(tablero, dificultad, float('-inf'), float('inf'), True)
+                if mejor_movimiento is not None:
+                    tablero = mejor_movimiento
+                    validar_promociones(tablero)
+                    turno = 1  # Cambia al turno del jugador
+                imprimir_tablero(tablero)  # Imprimir el tablero después del movimiento de la computadora
+
+            if es_estado_terminal(tablero):
+                corriendo = False
+                ganador = 'Rojo' if turno == 2 else 'Azul' if turno == 1 else 'Empate'
+                print(f"Juego terminado. Ganador: {ganador}")
+                if jugadas_erroneas:
+                    mostrar_retroalimentacion(VENTANA, jugadas_erroneas)
+
+        # Al salir del juego, liberar recursos
+        detector.release()
+        pygame.quit()
+        sys.exit()
 
 jugar_damas()
