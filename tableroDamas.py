@@ -6,7 +6,7 @@ from gestor_manos import GestureDetector
 pygame.init()
 ANCHO, ALTO = 800, 800
 VENTANA = pygame.display.set_mode((ANCHO, ALTO))
-pygame.display.set_caption("Damas Modernas")
+pygame.display.set_caption("Damas Inglesas")
 
 # Colores
 BLANCO = (255, 255, 255)
@@ -360,8 +360,21 @@ def obtener_todos_movimientos(tablero, jugador):
                     tableros.append(copia_tablero)
     return tableros
 
-def mostrar_menu():
+def mostrar_menu(ruta_fondo=None):
+    if ruta_fondo:
+        try:
+            fondo = pygame.image.load(ruta_fondo)
+            fondo = pygame.transform.scale(fondo, (ANCHO, ALTO))
+        except FileNotFoundError:
+            print(f"No se pudo cargar la imagen desde {ruta_fondo}. Usando fondo por defecto.")
+            fondo = None
+    else:
+        fondo = None
+
     VENTANA.fill(GRIS)
+    if fondo:
+        VENTANA.blit(fondo, (0, 0))  # Dibujar la imagen de fondo
+
     fuente = pygame.font.SysFont(None, 75)
     texto = fuente.render("Damas", True, NEGRO)
     VENTANA.blit(texto, (ANCHO // 2 - texto.get_width() // 2, ALTO // 4))
@@ -378,8 +391,10 @@ def mostrar_menu():
 
     pygame.display.update()
 
+
 def obtener_dificultad():
-    mostrar_menu()
+    ruta_fondo = "ADS/imagen-fondo-damas.jpg"  # Cambia esta ruta según necesites
+    mostrar_menu(ruta_fondo)
     while True:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
@@ -404,11 +419,12 @@ def hay_movimientos(tablero, jugador):
                     return True
     return False
 
-
 # Función principal del juego
 def jugar_damas():
     # Crear instancia del detector de gestos
     detector = GestureDetector()
+
+    
     while True:
         dificultad = obtener_dificultad()
         tablero = inicializar_tablero()
@@ -448,22 +464,21 @@ def jugar_damas():
                         cancel = True
 
             # Procesar gestos
-            gestos = detector.obtener_gestos()
+            gestos = detector.detectar_movimientos()
 
-            for gesto, mano in gestos:
-                if gesto == 'palma_abierta':
-                    if mano == 'Right':
-                        confirm = True
-                    elif mano == 'Left':
-                        cancel = True
-                elif gesto == 'dedo_apuntando_derecha':
+            for gesto in gestos:
+                if gesto == 'Movimiento Derecha':
                     move_right = True
-                elif gesto == 'dedo_apuntando_izquierda':
+                elif gesto == 'Movimiento Izquierda':
                     move_left = True
-                elif gesto == 'dedo_apuntando_arriba':
+                elif gesto == 'Movimiento Arriba':
                     move_up = True
-                elif gesto == 'dedo_apuntando_abajo':
+                elif gesto == 'Movimiento Abajo':
                     move_down = True
+                elif gesto == 'Inclinacion Enfrente Abajo':
+                    cancel = True
+                elif gesto == 'Inclinacion Enfrente Arriba':
+                    confirm = True
 
             # Actualizar el juego según las acciones detectadas
             if turno == 1:
